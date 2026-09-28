@@ -25,6 +25,14 @@ function getClient(): BigQuery {
   client = new BigQuery({
     projectId: process.env.BIGQUERY_PROJECT_ID ?? "bases-de-datos-sheets",
     credentials,
+    // Otoch_CONTROL es una tabla externa respaldada por un Google Sheet.
+    // Sin el scope de Drive, BigQuery tira "Permission denied while
+    // getting Drive credentials" aunque la cuenta de servicio ya tenga
+    // BigQuery Data Viewer sobre el dataset — son dos permisos distintos.
+    scopes: [
+      "https://www.googleapis.com/auth/bigquery",
+      "https://www.googleapis.com/auth/drive.readonly",
+    ],
   });
   return client;
 }
