@@ -7,7 +7,7 @@ export interface ResumenEmpresa {
 
 export interface PuntoMensual {
   anio: number;
-  mes: string;
+  /** 1 = enero ... 12 = diciembre, derivado de la fecha real (no de texto libre). */
   ordenMes: number;
   ingresos: number;
   egresos: number;

@@ -20,7 +20,9 @@ const MES_CORTO: Record<number, string> = {
 
 export function MonthlyChart({ datos, color }: { datos: PuntoMensual[]; color: string }) {
   const rows = datos.map((d) => ({
-    mes: MES_CORTO[d.ordenMes] ?? d.mes,
+    // Incluye el año corto a propósito: si la base llega a traer más de 12
+    // meses, dos diciembres de años distintos no deben verse como el mismo.
+    mes: `${MES_CORTO[d.ordenMes] ?? "?"} ${String(d.anio).slice(-2)}`,
     Ingresos: d.ingresos,
     Egresos: d.egresos,
   }));

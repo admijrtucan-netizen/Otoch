@@ -1,6 +1,5 @@
 import "server-only";
 import { EMPRESAS } from "@/lib/otoch/empresas";
-import { ordenDeMes } from "@/lib/otoch/types";
 import type {
   Categoria,
   PuntoMensual,
@@ -44,12 +43,11 @@ export function getSerieMensualMock(nombreEnBase: string): PuntoMensual[] {
 
   // Variación determinista (sin Math.random) para que el mock sea estable
   // entre renders y entre servidor/cliente.
-  return MESES_DEMO.map((mes, i) => {
+  return MESES_DEMO.map((_, i) => {
     const factor = 0.75 + ((i * 37) % 50) / 100; // entre 0.75 y 1.24
     return {
       anio: 2026,
-      mes,
-      ordenMes: ordenDeMes(mes),
+      ordenMes: i + 1,
       ingresos: Math.round(promedioIngreso * factor),
       egresos: Math.round(promedioEgreso * (1.5 - factor)),
     };

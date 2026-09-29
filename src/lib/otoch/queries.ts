@@ -1,6 +1,5 @@
 import "server-only";
 import { runQuery, DATASET } from "@/lib/bigquery";
-import { ordenDeMes } from "@/lib/otoch/types";
 import type {
   Categoria,
   PuntoMensual,
@@ -46,21 +45,25 @@ export async function getResumenPorEmpresa(): Promise<ResumenEmpresa[]> {
 export async function getSerieMensual(
   nombreEnBase: string
 ): Promise<PuntoMensual[]> {
+  // Se agrupa por la FECHA real, no por las columnas de texto libre "mes"/
+  // "A__o" — esas se capturan a mano y una sola vez que alguien escriba
+  // "Diciembre" en vez de "diciembre" ya cuenta como un mes aparte (mismo
+  // problema documentado en Brain OS con "Estrategia" escrita de 9 formas).
   const rows = await runQuery<{
     anio: number;
-    mes: string;
+    ordenMes: number;
     ingresos: number;
     egresos: number;
   }>(
     `
     SELECT
-      A__o AS anio,
-      mes AS mes,
+      EXTRACT(YEAR FROM FECHA_DE_REGISTRO) AS anio,
+      EXTRACT(MONTH FROM FECHA_DE_REGISTRO) AS ordenMes,
       ${CASE_INGRESO} AS ingresos,
       ${CASE_EGRESO} AS egresos
     FROM \`${TABLE}\`
-    WHERE EMPRESAS = @empresa
-    GROUP BY anio, mes
+    WHERE EMPRESAS = @empresa AND FECHA_DE_REGISTRO IS NOT NULL
+    GROUP BY anio, ordenMes
   `,
     { empresa: nombreEnBase }
   );
@@ -68,8 +71,7 @@ export async function getSerieMensual(
   return rows
     .map((r) => ({
       anio: r.anio,
-      mes: r.mes,
-      ordenMes: ordenDeMes(r.mes),
+      ordenMes: r.ordenMes,
       ingresos: r.ingresos ?? 0,
       egresos: r.egresos ?? 0,
     }))
