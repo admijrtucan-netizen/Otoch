@@ -304,6 +304,75 @@ export async function getMontoTotalOtoch(): Promise<number> {
   return rows[0]?.total ?? 0;
 }
 
+/**
+ * Combina getEstadoDeResultados() + getMontoTotalOtoch() en UNA sola
+ * consulta (dos SUM(CASE...) más sobre el mismo full-table-scan) en vez de
+ * dos — Otoch_CONTROL es una tabla externa sobre un Sheet y cada consulta
+ * cuesta ~2-3 s, así que fusionar las que comparten el mismo WHERE (ninguno,
+ * aquí) recorta el tiempo de carga de la página de Finanzas a la mitad.
+ */
+export async function getResumenFinanzasGeneral(): Promise<{
+  montoOtoch: number;
+  pyl: EstadoDeResultados;
+}> {
+  const rows = await runQuery<EstadoDeResultados & { montoOtoch: number }>(`
+    SELECT
+      ${pylSelect()},
+      SUM(CASE WHEN TIPO IN ('INGRESO', 'EGRESO', 'CC') THEN MONTO ELSE 0 END) AS montoOtoch
+    FROM \`${TABLE}\`
+  `);
+  const r = rows[0];
+  return {
+    montoOtoch: r?.montoOtoch ?? 0,
+    pyl: r ?? {
+      ventas: 0,
+      costoVenta: 0,
+      gastosAdmin: 0,
+      gastosVenta: 0,
+      gastosFinancieros: 0,
+      impuestos: 0,
+      otrosIngresos: 0,
+      otrosGastos: 0,
+    },
+  };
+}
+
+/**
+ * Combina getCuentasPorPagar() + getCuentasPorCobrar() en una sola consulta
+ * (mismo motivo que getResumenFinanzasGeneral arriba) — se pide TIPO IN
+ * ('CXP','CxC') de una vez y se separan las listas en JS.
+ */
+export async function getCuentasPendientesTodas(): Promise<{
+  porPagar: { total: number; movimientos: MovimientoPendiente[] };
+  porCobrar: { total: number; movimientos: MovimientoPendiente[] };
+}> {
+  const filas = await runQuery<MovimientoPendienteCrudo & { tipo: string }>(`
+    SELECT
+      TIPO AS tipo,
+      PROVEEDORES AS contraparte,
+      CONCEPTOS AS concepto,
+      ABS(MONTO) AS monto,
+      FECHA_DE_REGISTRO AS fecha
+    FROM \`${TABLE}\`
+    WHERE TIPO IN ('CXP', 'CxC')
+    ORDER BY fecha DESC
+  `);
+
+  const porPagarMov = filas.filter((f) => f.tipo === "CXP").map(limpiarMovimiento);
+  const porCobrarMov = filas.filter((f) => f.tipo === "CxC").map(limpiarMovimiento);
+
+  return {
+    porPagar: {
+      total: porPagarMov.reduce((a, m) => a + m.monto, 0),
+      movimientos: porPagarMov,
+    },
+    porCobrar: {
+      total: porCobrarMov.reduce((a, m) => a + m.monto, 0),
+      movimientos: porCobrarMov,
+    },
+  };
+}
+
 /** Cada pago de impuestos (SAT), con su fecha — para el acercamiento desde la tarjeta de Impuestos. */
 export async function getImpuestosDetalle(): Promise<PagoImpuesto[]> {
   const rows = await runQuery<{

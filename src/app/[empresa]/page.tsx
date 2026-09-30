@@ -106,7 +106,7 @@ export default async function EmpresaPage({
           <ObraTable obras={obras.datos} />
         </div>
 
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div className="grid grid-cols-1 items-start gap-5 sm:grid-cols-2">
           <RankedList
             title="Principales gastos por categoría"
             items={cats.datos.map((c) => ({ label: c.categoria, total: c.total }))}

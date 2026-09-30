@@ -164,3 +164,62 @@ export async function impuestosDetalle(): Promise<{
     return { datos: mock.getImpuestosDetalleMock(), esDemo: true };
   }
 }
+
+/** Une montoTotalOtoch() + estadoDeResultados() en una sola consulta real — ver nota en queries.ts. */
+export async function resumenFinanzasGeneral(): Promise<{
+  datos: { montoOtoch: number; pyl: EstadoDeResultados };
+  esDemo: boolean;
+}> {
+  if (!isBigQueryConfigured()) {
+    return {
+      datos: {
+        montoOtoch: mock.getMontoTotalOtochMock(),
+        pyl: mock.getEstadoDeResultadosMock(),
+      },
+      esDemo: true,
+    };
+  }
+  try {
+    return { datos: await real.getResumenFinanzasGeneral(), esDemo: false };
+  } catch (error) {
+    console.error("Falló la consulta real de resumen financiero general:", error);
+    return {
+      datos: {
+        montoOtoch: mock.getMontoTotalOtochMock(),
+        pyl: mock.getEstadoDeResultadosMock(),
+      },
+      esDemo: true,
+    };
+  }
+}
+
+/** Une cuentasPorPagar() + cuentasPorCobrar() en una sola consulta real — ver nota en queries.ts. */
+export async function cuentasPendientesTodas(): Promise<{
+  datos: {
+    porPagar: { total: number; movimientos: MovimientoPendiente[] };
+    porCobrar: { total: number; movimientos: MovimientoPendiente[] };
+  };
+  esDemo: boolean;
+}> {
+  if (!isBigQueryConfigured()) {
+    return {
+      datos: {
+        porPagar: mock.getCuentasPorPagarMock(),
+        porCobrar: mock.getCuentasPorCobrarMock(),
+      },
+      esDemo: true,
+    };
+  }
+  try {
+    return { datos: await real.getCuentasPendientesTodas(), esDemo: false };
+  } catch (error) {
+    console.error("Falló la consulta real de cuentas pendientes:", error);
+    return {
+      datos: {
+        porPagar: mock.getCuentasPorPagarMock(),
+        porCobrar: mock.getCuentasPorCobrarMock(),
+      },
+      esDemo: true,
+    };
+  }
+}

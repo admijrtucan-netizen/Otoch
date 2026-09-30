@@ -4,12 +4,8 @@ import { KpiCard } from "@/components/KpiCard";
 import { CuentaPendienteCard } from "@/components/CuentaPendienteCard";
 import { UtilidadWaterfall } from "@/components/UtilidadWaterfall";
 import { DemoBanner } from "@/components/DemoBanner";
-import {
-  cuentasPorCobrar,
-  cuentasPorPagar,
-  estadoDeResultados,
-  montoTotalOtoch,
-} from "@/lib/otoch/data";
+import { IconReceipt, IconWallet } from "@/components/icons";
+import { cuentasPendientesTodas, resumenFinanzasGeneral } from "@/lib/otoch/data";
 
 // La base se actualiza sola (Sheet en vivo detrás de BigQuery) — cada visita
 // debe volver a consultar, nunca servir una versión congelada del build.
@@ -18,14 +14,12 @@ export const dynamic = "force-dynamic";
 export default async function FinanzasPage() {
   // En serie a propósito, no Promise.all — Otoch_CONTROL es una tabla
   // externa sobre un Google Sheet y varias consultas simultáneas lo saturan
-  // ("Resources exceeded... Google Sheets service overloaded").
-  const montoOtoch = await montoTotalOtoch();
-  const pylTotal = await estadoDeResultados();
-  const cxp = await cuentasPorPagar();
-  const cxc = await cuentasPorCobrar();
+  // ("Resources exceeded... Google Sheets service overloaded"). Cada una de
+  // estas dos ya fusiona dos consultas viejas en una (ver queries.ts).
+  const resumen = await resumenFinanzasGeneral();
+  const cuentas = await cuentasPendientesTodas();
 
-  const esDemo =
-    montoOtoch.esDemo || pylTotal.esDemo || cxp.esDemo || cxc.esDemo;
+  const esDemo = resumen.esDemo || cuentas.esDemo;
 
   return (
     <AppShell>
@@ -40,30 +34,44 @@ export default async function FinanzasPage() {
 
       {esDemo && <DemoBanner />}
 
-      <div className="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Dinero OTOCH (suma total)" value={montoOtoch.datos} />
+      {/* Fila 1 — las tarjetas cortas van arriba y usan todo el ancho entre
+          las dos, en vez de quedar comprimidas junto a las largas. */}
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <KpiCard
+          label="Dinero OTOCH (suma total)"
+          value={resumen.datos.montoOtoch}
+          subtitulo="Ingresos + egresos + cambios de caja, con signo"
+          icon={IconWallet}
+          grande
+        />
 
         <Link href="/finanzas/impuestos" className="block">
           <KpiCard
             label="Dinero Impuestos (pagado al SAT) →"
-            value={pylTotal.datos.impuestos}
+            value={resumen.datos.pyl.impuestos}
+            subtitulo="Toca para ver cada pago, con fecha"
+            icon={IconReceipt}
             accent="negativo"
+            grande
           />
         </Link>
+      </div>
 
+      {/* Fila 2 — las tarjetas largas abajo, con el mismo ancho ganado. */}
+      <div className="mb-10 grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
         <CuentaPendienteCard
           titulo="Cuentas por pagar"
           subtitulo="Lo que OTOCH debe (comisiones, servicios de gestión)"
-          total={cxp.datos.total}
-          movimientos={cxp.datos.movimientos}
+          total={cuentas.datos.porPagar.total}
+          movimientos={cuentas.datos.porPagar.movimientos}
           color="var(--otoch-magenta)"
         />
 
         <CuentaPendienteCard
           titulo="Cuentas por cobrar"
           subtitulo="Lo que le deben a OTOCH (fondos de reserva de clientes)"
-          total={cxc.datos.total}
-          movimientos={cxc.datos.movimientos}
+          total={cuentas.datos.porCobrar.total}
+          movimientos={cuentas.datos.porCobrar.movimientos}
           color="var(--otoch-turquesa)"
         />
       </div>
@@ -82,7 +90,7 @@ export default async function FinanzasPage() {
           Las tres líneas de negocio juntas, de ventas a utilidad neta.
         </p>
       </div>
-      <UtilidadWaterfall pyl={pylTotal.datos} />
+      <UtilidadWaterfall pyl={resumen.datos.pyl} />
     </AppShell>
   );
 }
