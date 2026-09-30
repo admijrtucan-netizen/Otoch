@@ -23,6 +23,54 @@ export interface Proveedor {
   total: number;
 }
 
+export interface Obra {
+  obra: string;
+  ingresos: number;
+  egresos: number;
+  neto: number;
+}
+
+/**
+ * Estado de resultados (P&L) — espejo exacto de la columna ESTADO_DE_RESULTADOS
+ * del Sheet (a.VENTAS ... h.OTROS INGRESOS). Los totales derivados
+ * (utilidadBruta, utilidadOperativa, utilidadNeta) se calculan con
+ * `calcularUtilidades`, nunca se guardan por separado, para que la fórmula
+ * viva en un solo lugar.
+ */
+export interface EstadoDeResultados {
+  ventas: number;
+  costoVenta: number;
+  gastosAdmin: number;
+  gastosVenta: number;
+  gastosFinancieros: number;
+  impuestos: number;
+  otrosIngresos: number;
+  otrosGastos: number;
+}
+
+export interface Utilidades extends EstadoDeResultados {
+  utilidadBruta: number;
+  utilidadOperativa: number;
+  utilidadAntesDeImpuestos: number;
+  utilidadNeta: number;
+}
+
+export function calcularUtilidades(pyl: EstadoDeResultados): Utilidades {
+  const utilidadBruta = pyl.ventas - pyl.costoVenta;
+  const utilidadOperativa = utilidadBruta - pyl.gastosAdmin - pyl.gastosVenta;
+  const utilidadAntesDeImpuestos =
+    utilidadOperativa - pyl.gastosFinancieros + pyl.otrosIngresos - pyl.otrosGastos;
+  const utilidadNeta = utilidadAntesDeImpuestos - pyl.impuestos;
+  return { ...pyl, utilidadBruta, utilidadOperativa, utilidadAntesDeImpuestos, utilidadNeta };
+}
+
+export interface MovimientoPendiente {
+  contraparte: string;
+  concepto: string;
+  monto: number;
+  fecha: string;
+}
+
 export const ORDEN_MESES: Record<string, number> = {
   enero: 1,
   febrero: 2,
@@ -41,4 +89,11 @@ export const ORDEN_MESES: Record<string, number> = {
 export function ordenDeMes(mes: string | null | undefined): number {
   if (!mes) return 0;
   return ORDEN_MESES[mes.trim().toLowerCase()] ?? 0;
+}
+
+export interface PagoImpuesto {
+  fecha: string;
+  empresa: string;
+  concepto: string;
+  monto: number;
 }

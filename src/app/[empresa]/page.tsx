@@ -1,12 +1,20 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { TopNav } from "@/components/TopNav";
+import { AppShell } from "@/components/AppShell";
 import { KpiCard } from "@/components/KpiCard";
 import { MonthlyChart } from "@/components/MonthlyChart";
 import { RankedList } from "@/components/RankedList";
+import { ObraTable } from "@/components/ObraTable";
+import { UtilidadWaterfall } from "@/components/UtilidadWaterfall";
 import { DemoBanner } from "@/components/DemoBanner";
 import { getEmpresaBySlug } from "@/lib/otoch/empresas";
-import { categorias, serieMensual, topProveedores } from "@/lib/otoch/data";
+import {
+  categorias,
+  estadoDeResultados,
+  porObra,
+  serieMensual,
+  topProveedores,
+} from "@/lib/otoch/data";
 
 // La base se actualiza sola (Sheet en vivo detrás de BigQuery) — cada visita
 // debe volver a consultar, nunca servir una versión congelada del build.
@@ -21,21 +29,22 @@ export default async function EmpresaPage({
   const empresa = getEmpresaBySlug(slug);
   if (!empresa) notFound();
 
-  const [serie, cats, provs] = await Promise.all([
-    serieMensual(empresa.nombreEnBase),
-    categorias(empresa.nombreEnBase),
-    topProveedores(empresa.nombreEnBase),
-  ]);
+  // En serie a propósito, no Promise.all — ver nota en app/page.tsx sobre
+  // consultas simultáneas saturando el Google Sheet detrás de la tabla externa.
+  const serie = await serieMensual(empresa.nombreEnBase);
+  const cats = await categorias(empresa.nombreEnBase);
+  const provs = await topProveedores(empresa.nombreEnBase);
+  const pyl = await estadoDeResultados(empresa.nombreEnBase);
+  const obras = await porObra(empresa.nombreEnBase);
 
-  const esDemo = serie.esDemo || cats.esDemo || provs.esDemo;
+  const esDemo =
+    serie.esDemo || cats.esDemo || provs.esDemo || pyl.esDemo || obras.esDemo;
 
   const totalIngresos = serie.datos.reduce((a, d) => a + d.ingresos, 0);
   const totalEgresos = serie.datos.reduce((a, d) => a + d.egresos, 0);
 
   return (
-    <div className="flex flex-1 flex-col">
-      <TopNav />
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 py-12">
+    <AppShell>
         <Link
           href="/"
           className="mb-6 inline-block w-fit text-xs font-medium text-otoch-tinta/50 hover:text-otoch-magenta"
@@ -58,18 +67,48 @@ export default async function EmpresaPage({
         {esDemo && <DemoBanner />}
 
         <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <KpiCard label="Ingresos" value={totalIngresos} accent="positivo" />
-          <KpiCard label="Egresos" value={totalEgresos} accent="negativo" />
+          <KpiCard label="Cobros" value={totalIngresos} accent="positivo" />
+          <KpiCard label="Pagos" value={totalEgresos} accent="negativo" />
           <KpiCard label="Flujo neto" value={totalIngresos - totalEgresos} />
         </div>
 
-        <div className="mb-6">
+        <div className="mb-2">
+          <h2 className="font-display text-lg text-otoch-tinta">
+            Flujo de efectivo mensual
+          </h2>
+          <p className="text-sm text-otoch-tinta/50">
+            Cobros y pagos reales, mes a mes.
+          </p>
+        </div>
+        <div className="mb-10">
           <MonthlyChart datos={serie.datos} color={empresa.color} />
+        </div>
+
+        <div className="mb-2">
+          <h2 className="font-display text-lg text-otoch-tinta">
+            Utilidad de la línea
+          </h2>
+          <p className="text-sm text-otoch-tinta/50">
+            De ventas a utilidad neta, con el estado de resultados de esta línea.
+          </p>
+        </div>
+        <div className="mb-10">
+          <UtilidadWaterfall pyl={pyl.datos} />
+        </div>
+
+        <div className="mb-2">
+          <h2 className="font-display text-lg text-otoch-tinta">Por obra</h2>
+          <p className="text-sm text-otoch-tinta/50">
+            Ingresos y egresos por propiedad/proyecto dentro de esta línea.
+          </p>
+        </div>
+        <div className="mb-10">
+          <ObraTable obras={obras.datos} />
         </div>
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <RankedList
-            title="Por categoría"
+            title="Principales gastos por categoría"
             items={cats.datos.map((c) => ({ label: c.categoria, total: c.total }))}
             color={empresa.color}
           />
@@ -79,7 +118,6 @@ export default async function EmpresaPage({
             color={empresa.color}
           />
         </div>
-      </main>
-    </div>
+    </AppShell>
   );
 }
