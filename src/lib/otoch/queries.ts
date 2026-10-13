@@ -239,7 +239,18 @@ export async function getPorObra(
   }));
 }
 
-/** Dinero que OTOCH le debe a terceros — TIPO = 'CXP' (cuentas por pagar). */
+/**
+ * OJO — bug real encontrado y corregido (2026-10-13): una fila nueva del
+ * 6 de octubre traía TIPO="CXC" (todo mayúsculas) mientras las filas
+ * anteriores traían "CxC" — para BigQuery son dos textos distintos (`=` es
+ * sensible a mayúsculas) y la fila se quedaba fuera en silencio. Mismo
+ * problema que "Diciembre"/"diciembre" en la agrupación mensual. Por eso
+ * CXP/CXC se comparan con UPPER(TRIM(...)) en vez de igualdad directa.
+ */
+const ES_CXP = `UPPER(TRIM(TIPO)) = 'CXP'`;
+const ES_CXC = `UPPER(TRIM(TIPO)) = 'CXC'`;
+
+/** Dinero que OTOCH le debe a terceros (cuentas por pagar). */
 export async function getCuentasPorPagar(): Promise<{
   total: number;
   movimientos: MovimientoPendiente[];
@@ -252,7 +263,7 @@ export async function getCuentasPorPagar(): Promise<{
       ABS(MONTO) AS monto,
       FECHA_DE_REGISTRO AS fecha
     FROM \`${TABLE}\`
-    WHERE TIPO = 'CXP'
+    WHERE ${ES_CXP}
     ORDER BY fecha DESC
   `
   );
@@ -263,7 +274,7 @@ export async function getCuentasPorPagar(): Promise<{
   };
 }
 
-/** Dinero que le deben a OTOCH — TIPO = 'CxC' (cuentas por cobrar, p.ej. fondos de reserva). */
+/** Dinero que le deben a OTOCH (cuentas por cobrar, p.ej. fondos de reserva). */
 export async function getCuentasPorCobrar(): Promise<{
   total: number;
   movimientos: MovimientoPendiente[];
@@ -276,7 +287,7 @@ export async function getCuentasPorCobrar(): Promise<{
       ABS(MONTO) AS monto,
       FECHA_DE_REGISTRO AS fecha
     FROM \`${TABLE}\`
-    WHERE TIPO = 'CxC'
+    WHERE ${ES_CXC}
     ORDER BY fecha DESC
   `
   );
@@ -299,7 +310,7 @@ export async function getMontoTotalOtoch(): Promise<number> {
   const rows = await runQuery<{ total: number }>(`
     SELECT SUM(MONTO) AS total
     FROM \`${TABLE}\`
-    WHERE TIPO IN ('INGRESO', 'EGRESO', 'CC')
+    WHERE UPPER(TRIM(TIPO)) IN ('INGRESO', 'EGRESO', 'CC')
   `);
   return rows[0]?.total ?? 0;
 }
@@ -318,7 +329,7 @@ export async function getResumenFinanzasGeneral(): Promise<{
   const rows = await runQuery<EstadoDeResultados & { montoOtoch: number }>(`
     SELECT
       ${pylSelect()},
-      SUM(CASE WHEN TIPO IN ('INGRESO', 'EGRESO', 'CC') THEN MONTO ELSE 0 END) AS montoOtoch
+      SUM(CASE WHEN UPPER(TRIM(TIPO)) IN ('INGRESO', 'EGRESO', 'CC') THEN MONTO ELSE 0 END) AS montoOtoch
     FROM \`${TABLE}\`
   `);
   const r = rows[0];
@@ -348,18 +359,18 @@ export async function getCuentasPendientesTodas(): Promise<{
 }> {
   const filas = await runQuery<MovimientoPendienteCrudo & { tipo: string }>(`
     SELECT
-      TIPO AS tipo,
+      UPPER(TRIM(TIPO)) AS tipo,
       PROVEEDORES AS contraparte,
       CONCEPTOS AS concepto,
       ABS(MONTO) AS monto,
       FECHA_DE_REGISTRO AS fecha
     FROM \`${TABLE}\`
-    WHERE TIPO IN ('CXP', 'CxC')
+    WHERE UPPER(TRIM(TIPO)) IN ('CXP', 'CXC')
     ORDER BY fecha DESC
   `);
 
   const porPagarMov = filas.filter((f) => f.tipo === "CXP").map(limpiarMovimiento);
-  const porCobrarMov = filas.filter((f) => f.tipo === "CxC").map(limpiarMovimiento);
+  const porCobrarMov = filas.filter((f) => f.tipo === "CXC").map(limpiarMovimiento);
 
   return {
     porPagar: {
