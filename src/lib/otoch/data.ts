@@ -4,6 +4,7 @@ import * as mock from "@/lib/otoch/mock-data";
 import type {
   Categoria,
   EstadoDeResultados,
+  MontoPorBanco,
   MovimientoPendiente,
   Obra,
   PagoImpuesto,
@@ -221,5 +222,20 @@ export async function cuentasPendientesTodas(): Promise<{
       },
       esDemo: true,
     };
+  }
+}
+
+export async function montoPorBanco(): Promise<{
+  datos: MontoPorBanco[];
+  esDemo: boolean;
+}> {
+  if (!isBigQueryConfigured()) {
+    return { datos: mock.getMontoPorBancoMock(), esDemo: true };
+  }
+  try {
+    return { datos: await real.getMontoPorBanco(), esDemo: false };
+  } catch (error) {
+    console.error("Falló la consulta real de monto por banco:", error);
+    return { datos: mock.getMontoPorBancoMock(), esDemo: true };
   }
 }

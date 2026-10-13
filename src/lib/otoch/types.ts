@@ -23,6 +23,12 @@ export interface Proveedor {
   total: number;
 }
 
+/** "Dinero OTOCH" separado por cuenta bancaria (columna DEPARTAMENTO_PROYECTO del Sheet). */
+export interface MontoPorBanco {
+  banco: string;
+  total: number;
+}
+
 export interface Obra {
   obra: string;
   ingresos: number;

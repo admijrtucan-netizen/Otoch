@@ -3,6 +3,7 @@ import { runQuery, DATASET } from "@/lib/bigquery";
 import type {
   Categoria,
   EstadoDeResultados,
+  MontoPorBanco,
   MovimientoPendiente,
   Obra,
   PagoImpuesto,
@@ -313,6 +314,27 @@ export async function getMontoTotalOtoch(): Promise<number> {
     WHERE UPPER(TRIM(TIPO)) IN ('INGRESO', 'EGRESO', 'CC')
   `);
   return rows[0]?.total ?? 0;
+}
+
+/**
+ * "Dinero OTOCH" separado por cuenta bancaria — columna DEPARTAMENTO_PROYECTO
+ * del Sheet (banco real: SANTANDER/BBVA). Esta columna faltaba en el
+ * esquema que BigQuery había autodetectado (era la 21.ª y última columna
+ * del rango A:U, y el autodetect se quedó corto en 20) — se agregó al
+ * esquema de la tabla externa el 2026-10-13 vía la API de BigQuery
+ * (`table.setMetadata`), no por SQL: `ALTER TABLE` no soporta cambiar el
+ * esquema de una tabla externa.
+ */
+export async function getMontoPorBanco(): Promise<MontoPorBanco[]> {
+  return runQuery<MontoPorBanco>(`
+    SELECT
+      COALESCE(NULLIF(TRIM(DEPARTAMENTO_PROYECTO), ''), 'Sin banco asignado') AS banco,
+      SUM(MONTO) AS total
+    FROM \`${TABLE}\`
+    WHERE UPPER(TRIM(TIPO)) IN ('INGRESO', 'EGRESO', 'CC')
+    GROUP BY banco
+    ORDER BY total DESC
+  `);
 }
 
 /**

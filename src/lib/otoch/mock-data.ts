@@ -3,6 +3,7 @@ import { EMPRESAS } from "@/lib/otoch/empresas";
 import type {
   Categoria,
   EstadoDeResultados,
+  MontoPorBanco,
   MovimientoPendiente,
   Obra,
   PagoImpuesto,
@@ -249,5 +250,13 @@ export function getImpuestosDetalleMock(): PagoImpuesto[] {
     { fecha: "2026-09-11", empresa: "OTOCH COLIBRI", concepto: "Línea de captura SAT", monto: 10652 },
     { fecha: "2026-09-11", empresa: "OTOCH COLIBRI", concepto: "Línea de captura SAT", monto: 5672 },
     { fecha: "2026-07-06", empresa: "OTOCH COLIBRI", concepto: "Línea de captura SAT", monto: 26471 },
+  ];
+}
+
+export function getMontoPorBancoMock(): MontoPorBanco[] {
+  return [
+    { banco: "SANTANDER", total: 82000 },
+    { banco: "BBVA", total: 13267 },
+    { banco: "Sin banco asignado", total: 2000 },
   ];
 }

@@ -5,7 +5,12 @@ import { CuentaPendienteCard } from "@/components/CuentaPendienteCard";
 import { UtilidadWaterfall } from "@/components/UtilidadWaterfall";
 import { DemoBanner } from "@/components/DemoBanner";
 import { IconReceipt, IconWallet } from "@/components/icons";
-import { cuentasPendientesTodas, resumenFinanzasGeneral } from "@/lib/otoch/data";
+import { formatMoney } from "@/lib/format";
+import {
+  cuentasPendientesTodas,
+  montoPorBanco,
+  resumenFinanzasGeneral,
+} from "@/lib/otoch/data";
 
 // La base se actualiza sola (Sheet en vivo detrás de BigQuery) — cada visita
 // debe volver a consultar, nunca servir una versión congelada del build.
@@ -14,12 +19,13 @@ export const dynamic = "force-dynamic";
 export default async function FinanzasPage() {
   // En serie a propósito, no Promise.all — Otoch_CONTROL es una tabla
   // externa sobre un Google Sheet y varias consultas simultáneas lo saturan
-  // ("Resources exceeded... Google Sheets service overloaded"). Cada una de
-  // estas dos ya fusiona dos consultas viejas en una (ver queries.ts).
+  // ("Resources exceeded... Google Sheets service overloaded"). Las dos
+  // primeras ya fusionan dos consultas viejas cada una (ver queries.ts).
   const resumen = await resumenFinanzasGeneral();
   const cuentas = await cuentasPendientesTodas();
+  const bancos = await montoPorBanco();
 
-  const esDemo = resumen.esDemo || cuentas.esDemo;
+  const esDemo = resumen.esDemo || cuentas.esDemo || bancos.esDemo;
 
   return (
     <AppShell>
@@ -36,14 +42,40 @@ export default async function FinanzasPage() {
 
       {/* Fila 1 — las tarjetas cortas van arriba y usan todo el ancho entre
           las dos, en vez de quedar comprimidas junto a las largas. */}
-      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <KpiCard
-          label="Dinero OTOCH (suma total)"
-          value={resumen.datos.montoOtoch}
-          subtitulo="Ingresos + egresos + cambios de caja, con signo"
-          icon={IconWallet}
-          grande
-        />
+      <div className="mb-4 grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+        <div className="rounded-2xl border border-otoch-turquesa/15 bg-white/70 px-5 py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-otoch-tinta/50">
+                Dinero OTOCH (suma total)
+              </p>
+              <p className="font-display text-3xl text-otoch-tinta">
+                {formatMoney(resumen.datos.montoOtoch)}
+              </p>
+              <p className="mt-1 text-xs text-otoch-tinta/45">
+                Ingresos + egresos + cambios de caja, con signo
+              </p>
+            </div>
+            <div className="shrink-0 rounded-xl bg-otoch-violeta/12 p-2.5 text-otoch-violeta">
+              <IconWallet className="h-5 w-5" />
+            </div>
+          </div>
+
+          {/* Desglose por banco (columna DEPARTAMENTO_PROYECTO del Sheet) */}
+          <ul className="mt-4 space-y-2 border-t border-otoch-tinta/10 pt-3">
+            {bancos.datos.map((b) => (
+              <li
+                key={b.banco}
+                className="flex items-center justify-between text-sm"
+              >
+                <span className="text-otoch-tinta/70">{b.banco}</span>
+                <span className="font-medium text-otoch-tinta">
+                  {formatMoney(b.total)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
 
         <Link href="/finanzas/impuestos" className="block">
           <KpiCard
